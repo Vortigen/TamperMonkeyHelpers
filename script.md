@@ -2,8 +2,8 @@
 // @name         PlanITpocker helper
 // @namespace    http://tampermonkey.net/
 // @description  Adding helper messages in the JS console. Reloading on signalR disconnect. Votes in JS console preserved.
+// @version      1.4
 // @match        https://www.planitpoker.com/board*
-// @version 1.3
 // @run-at       document-start
 // ==/UserScript==
 
@@ -44,7 +44,7 @@ e.hub.received(function(a){
         if (!window.loaded) {
             window.loaded = true;
             console.clear();
-            console.log('---------- PlanITpocker helper 12.9.2023 :) ----------');
+            console.log('---------- PlanITpocker helper 13.9.2023 :) ----------');
             const room = document.location.hash.split('/')?.[2];
             const actionsString = window.localStorage['room'] && window.localStorage['room'] === room
                 ? (window.localStorage['actions'] || '[]')
@@ -75,7 +75,7 @@ e.hub.received(function(a){
         }];
     }
 
-    if (!action || action === 'userJoinedGame' || action === 'userUserLeftGame') {
+    if (!action || action === 'userJoinedGame' || action === 'userUserLeftGame' || action === 'userRolesUpdated') {
         return;
     }
 
@@ -97,7 +97,7 @@ e.hub.connectionSlow`;
         let oldScript = mutations
             .flatMap(e => [...e.addedNodes])
             .filter(e => e.tagName == 'SCRIPT')
-            .find(e => e.src.match(/application\.js\?v=1\.0\.0\.35759/));
+            .find(e => e.src.match(/application\.js\?v=1\.0\.0\./));
 
         if (oldScript) {
             observer.disconnect();
