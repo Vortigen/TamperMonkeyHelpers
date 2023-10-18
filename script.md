@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PlanITpocker helper
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Adding helper messages in the JS console. Reloading on signalR disconnect. Votes in JS console preserved.
 // @match        https://www.planitpoker.com/board*
 // @run-at       document-start
