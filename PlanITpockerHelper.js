@@ -1,94 +1,119 @@
 // ==UserScript==
-// @name         Fourth Open VPN auto login
+// @name         PlanITpocker helper
 // @namespace    http://tampermonkey.net/
-// @version      1.3
-// @description  Fourth Open VPN auto login
-// @author       :bashtata-na-terminala:
-// @match        https://login.microsoftonline.com/*/saml2
-// @match        https://login.microsoftonline.com/*/login
-// @match        https://login.microsoftonline.com/common/DeviceAuthTls/reprocess
-// @match        https://login.microsoftonline.com/common/SAS/ProcessAuth
+// @description  Adding helper messages in the JS console. Reloading on signalR disconnect. Votes in JS console preserved.
+// @version      1.4
+// @match        https://www.planitpoker.com/board*
 // @run-at       document-start
 // ==/UserScript==
 
-(() => {
+/*
+ORIGINAL SCRIPT:
+    e.hub.disconnected(function() {
+        console.log("disconnected"),
+        clearInterval(r),
+        setTimeout(function() {
+            e.hub.start()
+        }, 5e3)
+    }),
+    e.hub.received(function() {
+        console.log("received")
+    }),
+    e.hub.connectionSlow
+*/
 
-    // EDIT /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    const email = 'your.name@fourth.com';
-    const password = '<your-password>';
-    const secretKey = '0123456789abcdef';
-    // Add new TOTP from here: https://mysignins.microsoft.com/security-info
-    //   > Add sign-in method > Authenticator app > I want to use a different authenticator app > Can't scan image? > Secret key
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+const replaceScript = `
 
-    console.log('Fourth Open VPN auto login');
+e.hub.disconnected(function() {
+    document.location.reload();
+}),
 
-    const validate = (input) => input.dispatchEvent(new Event('input', { bubbles: true }));
-    const isLocation = (str) => document.location.pathname.includes(str);
-    const getInput = (type, value) => new Promise((resolve) => {
-        const selector = `input[type="${type}"]${value ? `[value="${value}"]` : ''}`;
-        if (document.querySelector(selector)) {
-            return resolve(document.querySelector(selector));
+e.hub.received(function(a){
+    console.debug(">>>> Received", a);
+    const isModerator = () => !!$('.pull-right > .btn-group')[0];
+    if (isModerator()) return;
+
+    const hub = a?.H || ''; // pokerGameHub
+    const action = a?.M || '';
+    const data = a?.A?.[0] || {};
+    console.debug(">>>>", { hub, action, data });
+
+    const init = () => {
+        if (isModerator()) return;
+
+        if (!window.loaded) {
+            window.loaded = true;
+            console.clear();
+            console.log('---------- PlanITpocker helper 13.9.2023 :) ----------');
+            const room = document.location.hash.split('/')?.[2];
+            const actionsString = window.localStorage['room'] && window.localStorage['room'] === room
+                ? (window.localStorage['actions'] || '[]')
+                : '[]';
+
+            window.actions = JSON.parse(actionsString);
+            window.actions.forEach((actionArr) => console.log(...actionArr));
+
+            window.stop = () => e.hub.stop(); // simulate signalR disconnect
+            window.cls = () => { // clear actions
+                window.loaded = false;
+                window.actions = [];
+                window.localStorage['actions'] = '[]';
+                init();
+                return "actions cleared :)";
+            };
         }
-        const observer = new MutationObserver((mutations) => {
-            if (document.querySelector(selector)) {
-                observer.disconnect();
-                resolve(document.querySelector(selector));
-            }
-        });
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-        });
-    });
-    const loadScript = () => new Promise((resolve) => {
-        console.log('loadScript');
-        const script = document.createElement('script');
-        script.addEventListener('load', () => {
-            console.log('loadScript loaded');
-            resolve();
-        });
-        script.setAttribute('src', 'https://cdnjs.cloudflare.com/ajax/libs/otpauth/9.1.5/otpauth.umd.min.js');
-        document.head.appendChild(script);
-        console.log('loadScript done');
-    });
+    };
+    (!window.loaded) && setTimeout(init, 2000);
 
-    document.addEventListener("DOMContentLoaded", async () => {
-        // STEP 1
-        if (isLocation('saml2')) {
-            console.log('STEP 1/3 (email, password)');
-            const emailInput = await getInput('email');
-            const submitEmailButton = await getInput('submit', 'Next');
-            emailInput.value = email;
-            validate(emailInput);
-            submitEmailButton.click();
+    let actionArr;
+    var voteMap = {'0': 0, '1': '1/2', '2': 1, '3': 2, '4': 3, '5': 5, '6': 8, '7': 13, '8': 20, '9': 40, '10': 100, '-1': '?', '-2': 'coffee'};
 
-            const passwordInput = await getInput('password');
-            passwordInput.value = password;
-            validate(passwordInput);
-            const submitPasswordButton = await getInput('submit', 'Sign in');
-            submitPasswordButton.click();
-            console.log('STEP 1/3 done');
+    if (action === 'storyVoted') {
+        actionArr = [{
+            "userName": data.userName,
+            "vote": voteMap['' + data.vote],
+        }];
+    }
+
+    if (!action || action === 'userJoinedGame' || action === 'userUserLeftGame' || action === 'userRolesUpdated') {
+        return;
+    }
+
+    actionArr = actionArr || ['>>>', action, data];
+    console.log(...actionArr);
+
+    window.actions = window.actions || [];
+    window.actions.push(actionArr);
+    window.localStorage['actions'] = JSON.stringify(window.actions);
+    window.localStorage['room'] = document.location.hash.split('/')?.[2];
+}),
+
+e.hub.connectionSlow`;
+
+(function() {
+    'use strict';
+
+    new MutationObserver(async (mutations, observer) => {
+        let oldScript = mutations
+            .flatMap(e => [...e.addedNodes])
+            .filter(e => e.tagName == 'SCRIPT')
+            .find(e => e.src.match(/application\.js\?v=1\.0\.0\./));
+
+        if (oldScript) {
+            observer.disconnect();
+            oldScript.remove();
+
+            let text = await fetch(oldScript.src)
+                .then(e => e.text())
+                .then(e => e.replace(/e.hub.disconnected.*e\.hub\.connectionSlow/g, replaceScript));
+
+            let newScript = document.createElement('script');
+            newScript.type = 'text/javascript';
+            newScript.textContent = text;
+            document.querySelector('head').appendChild(newScript);
         }
-
-        // STEP 2
-        if (isLocation('reprocess') || isLocation('login')) {
-            console.log('STEP 2/3 (code)');
-            await loadScript();
-            const codeInput = await getInput('tel');
-            codeInput.value = new OTPAuth.TOTP({ secret: secretKey }).generate();
-            validate(codeInput);
-            const submitCodeButton = await getInput('submit');
-            submitCodeButton.click();
-            console.log('STEP 2/3 done');
-        }
-
-        // STEP 3
-        if (isLocation('ProcessAuth')) {
-            console.log('STEP 3/3 (remember)');
-            const submitYesButton = await getInput('submit');
-            submitYesButton.click();
-            console.log('STEP 3/3 done');
-        }
-    });
+    }).observe(document, {
+        childList: true,
+        subtree: true,
+    })
 })();
