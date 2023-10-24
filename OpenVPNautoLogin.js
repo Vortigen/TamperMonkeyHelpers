@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Fourth Open VPN auto login
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Fourth Open VPN auto login
 // @author       :bashtata-na-terminala:
 // @match        https://login.microsoftonline.com/*/saml2
@@ -14,9 +14,9 @@
 (() => {
 
     // EDIT /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    const email = 'your.name@fourth.com';
-    const password = '<your-password>';
-    const secretKey = '0123456789abcdef';
+    const email = ''; // use empty for auto fill
+    const password = '';   // use empty for auto fill
+    const secretKey = '';
     // Add new TOTP from here: https://mysignins.microsoft.com/security-info
     //   > Add sign-in method > Authenticator app > I want to use a different authenticator app > Can't scan image? > Secret key
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,6 +25,10 @@
 
     const validate = (input) => input.dispatchEvent(new Event('input', { bubbles: true }));
     const isLocation = (str) => document.location.pathname.includes(str);
+    const waitValue = (element) => new Promise((resolve) => {
+        const checkValue = () => element.value ? resolve() : setTimeout(checkValue, 100);
+        checkValue();
+    });
     const getInput = (type, value) => new Promise((resolve) => {
         const selector = `input[type="${type}"]${value ? `[value="${value}"]` : ''}`;
         if (document.querySelector(selector)) {
@@ -59,12 +63,14 @@
             console.log('STEP 1/3 (email, password)');
             const emailInput = await getInput('email');
             const submitEmailButton = await getInput('submit', 'Next');
-            emailInput.value = email;
+            email && (emailInput.value = email);
+            await waitValue(emailInput);
             validate(emailInput);
             submitEmailButton.click();
 
             const passwordInput = await getInput('password');
-            passwordInput.value = password;
+            password && (passwordInput.value = password);
+            await waitValue(passwordInput);
             validate(passwordInput);
             const submitPasswordButton = await getInput('submit', 'Sign in');
             submitPasswordButton.click();
