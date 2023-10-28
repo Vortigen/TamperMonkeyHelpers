@@ -1,4 +1,4 @@
-# PlanITpockerHelper
+# PlanITpoker
 http://tampermonkey.net/
 https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en
 ![image](https://github.com/Vortigen/PlanITpockerHelper/assets/449367/5e55a15e-dd05-4b40-8838-2a4d3b9ace88)
