@@ -2,7 +2,7 @@
 // @name         PlanITpocker helper
 // @namespace    http://tampermonkey.net/
 // @description  Adding helper messages in the JS console. Reloading on signalR disconnect. Votes in JS console preserved.
-// @version      1.4
+// @version      2.0
 // @match        https://www.planitpoker.com/board*
 // @run-at       document-start
 // ==/UserScript==
@@ -44,7 +44,7 @@ e.hub.received(function(a){
         if (!window.loaded) {
             window.loaded = true;
             console.clear();
-            console.log('---------- PlanITpocker helper 13.9.2023 :) ----------');
+            console.log('---------- PlanITpocker helper 07.12.2023 :) ----------');
             const room = document.location.hash.split('/')?.[2];
             const actionsString = window.localStorage['room'] && window.localStorage['room'] === room
                 ? (window.localStorage['actions'] || '[]')
@@ -66,12 +66,37 @@ e.hub.received(function(a){
     (!window.loaded) && setTimeout(init, 2000);
 
     let actionArr;
-    var voteMap = {'0': 0, '1': '1/2', '2': 1, '3': 2, '4': 3, '5': 5, '6': 8, '7': 13, '8': 20, '9': 40, '10': 100, '-1': '?', '-2': 'coffee'};
+
+    const voteMap = {
+        'scrum': {'0': 0, '1': '1/2', '2': 1, '3': 2, '4': 3, '5': 5, '6': 8, '7': 13, '8': 20, '9': 40, '10': 100, '-1': '?', '-2': 'Coffee'},
+        'fibonacci': {'0': 0, '1': 1, '2': 2, '3': 3, '4': 5, '5': 8, '6': 13, '7': 21, '8': 34, '9': 55, '10': 89, '-1': '?', '-2': 'Coffee'},
+        'sequential': {'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, '-1': '?', '-2': 'Coffee'},
+        'playingCards': {'0': 'Ace', '1': 2, '2': 3, '3': 5, '4': 8, '5': 'King', '-1': '?', '-2': 'Coffee'},
+        'tShirt': {'0': 'XS', '1': 'S', '2': 'M', '3': 'L', '4': 'XL', '5': 'XXL', '-1': '?', '-2': 'Coffee'},
+    };
+    const getGameType = () => {
+        const pageButtons = Array.from(document.querySelectorAll('ul.cards button div.center-icon'), el => el?.textContent?.trim() || 'c');
+
+        const tShirtUniques = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+        if (pageButtons.some(pb => tShirtUniques.includes(pb))) return 'tShirt';
+
+        const playingCardsUniques = ['Ace', 'King'];
+        if (pageButtons.some(pb => playingCardsUniques.includes(pb))) return 'playingCards';
+
+        const sequentialUniques = ['4', '6', '7', '9', '10'];
+        if (pageButtons.some(pb => sequentialUniques.includes(pb))) return 'sequential';
+
+        const fibonacciUniques = ['21', '34', '55', '89'];
+        if (pageButtons.some(pb => fibonacciUniques.includes(pb))) return 'fibonacci';
+
+        return 'scrum';
+    };
+    const gameType = getGameType();
 
     if (action === 'storyVoted') {
         actionArr = [{
             "userName": data.userName,
-            "vote": voteMap['' + data.vote],
+            "vote": voteMap[gameType]['' + data.vote],
         }];
     }
 
