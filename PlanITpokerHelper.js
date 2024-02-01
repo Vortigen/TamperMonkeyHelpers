@@ -1,144 +1,145 @@
 // ==UserScript==
-// @name         PlanITpocker helper
+// @name         2024 PlanITpocker helper
 // @namespace    http://tampermonkey.net/
-// @description  Adding helper messages in the JS console. Reloading on signalR disconnect. Votes in JS console preserved.
-// @version      2.0
-// @match        https://www.planitpoker.com/board*
+// @description  Adding helper messages in the JS console.
+// @version      3.0
+// @match        https://app.planitpoker.com/room/*
 // @run-at       document-start
 // ==/UserScript==
 
-/*
-ORIGINAL SCRIPT:
-    e.hub.disconnected(function() {
-        console.log("disconnected"),
-        clearInterval(r),
-        setTimeout(function() {
-            e.hub.start()
-        }, 5e3)
-    }),
-    e.hub.received(function() {
-        console.log("received")
-    }),
-    e.hub.connectionSlow
-*/
+/* eslint-disable prettier/prettier */
+// unsafeWindow.WebSocket hook /////////////////////////////////////////////////////////////////////
 
-const replaceScript = `
+const wsUrlMatch = '.firebaseio.com/.ws?v=';
+let board = {};
 
-e.hub.disconnected(function() {
-    document.location.reload();
-}),
+const wsReceive = function(msg, url, wsObject) {
+    // console.debug(">>> Received message from " + url + " : " + msg.data);
+    if (!url.includes(wsUrlMatch)) return msg;
 
-e.hub.received(function(a){
-    console.debug(">>>> Received", a);
-    const isModerator = () => !!$('.pull-right > .btn-group')[0];
-    if (isModerator()) return;
+    let data = JSON.parse(msg.data);
+    console.debug(msg.data, data);
 
-    const hub = a?.H || ''; // pokerGameHub
-    const action = a?.M || '';
-    const data = a?.A?.[0] || {};
-    console.debug(">>>>", { hub, action, data });
+    if (data?.t !== 'd' || !data?.d) return msg;
 
-    const init = () => {
-        if (isModerator()) return;
-
-        if (!window.loaded) {
-            window.loaded = true;
-            console.clear();
-            console.log('---------- PlanITpocker helper 07.12.2023 :) ----------');
-            const room = document.location.hash.split('/')?.[2];
-            const actionsString = window.localStorage['room'] && window.localStorage['room'] === room
-                ? (window.localStorage['actions'] || '[]')
-                : '[]';
-
-            window.actions = JSON.parse(actionsString);
-            window.actions.forEach((actionArr) => console.log(...actionArr));
-
-            window.stop = () => e.hub.stop(); // simulate signalR disconnect
-            window.cls = () => { // clear actions
-                window.loaded = false;
-                window.actions = [];
-                window.localStorage['actions'] = '[]';
-                init();
-                return "actions cleared :)";
-            };
-        }
-    };
-    (!window.loaded) && setTimeout(init, 2000);
-
-    let actionArr;
-
-    const voteMap = {
-        'scrum': {'0': 0, '1': '1/2', '2': 1, '3': 2, '4': 3, '5': 5, '6': 8, '7': 13, '8': 20, '9': 40, '10': 100, '-1': '?', '-2': 'Coffee'},
-        'fibonacci': {'0': 0, '1': 1, '2': 2, '3': 3, '4': 5, '5': 8, '6': 13, '7': 21, '8': 34, '9': 55, '10': 89, '-1': '?', '-2': 'Coffee'},
-        'sequential': {'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, '-1': '?', '-2': 'Coffee'},
-        'playingCards': {'0': 'Ace', '1': 2, '2': 3, '3': 5, '4': 8, '5': 'King', '-1': '?', '-2': 'Coffee'},
-        'tShirt': {'0': 'XS', '1': 'S', '2': 'M', '3': 'L', '4': 'XL', '5': 'XXL', '-1': '?', '-2': 'Coffee'},
-    };
-    const getGameType = () => {
-        const pageButtons = Array.from(document.querySelectorAll('ul.cards button div.center-icon'), el => el?.textContent?.trim() || 'c');
-
-        const tShirtUniques = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-        if (pageButtons.some(pb => tShirtUniques.includes(pb))) return 'tShirt';
-
-        const playingCardsUniques = ['Ace', 'King'];
-        if (pageButtons.some(pb => playingCardsUniques.includes(pb))) return 'playingCards';
-
-        const sequentialUniques = ['4', '6', '7', '9', '10'];
-        if (pageButtons.some(pb => sequentialUniques.includes(pb))) return 'sequential';
-
-        const fibonacciUniques = ['21', '34', '55', '89'];
-        if (pageButtons.some(pb => fibonacciUniques.includes(pb))) return 'fibonacci';
-
-        return 'scrum';
-    };
-    const gameType = getGameType();
-
-    if (action === 'storyVoted') {
-        actionArr = [{
-            "userName": data.userName,
-            "vote": voteMap[gameType]['' + data.vote],
-        }];
+    // Board
+    if (data.d.b?.d?.users && data.d.b?.d?.name) {
+        board = data.d.b.d;
+        console.debug('>>> Board received', board);
     }
 
-    if (!action || action === 'userJoinedGame' || action === 'userUserLeftGame' || action === 'userRolesUpdated') {
-        return;
+    // Votes
+    if (data.d.a === 'm' && !!data.d.b?.p && !!data.d.b?.d?.voted_at) {
+        const id = data.d.b.p.split('/');
+        const userId = id[0] === 'rooms' && id[2] === 'users' ? id[3] : 'Unknown';
+        const userName = board.users?.[userId]?.name || userId;
+        const vote = data.d.b.d.vote;
+
+        let voteMap = {
+            'scrum': {'0': 0, '1': '1/2', '2': 1, '3': 2, '4': 3, '5': 5, '6': 8, '7': 13, '8': 20, '9': 40, '10': 100, '-1': '?', '-2': 'Coffee'},
+            'fibonacci': {'0': 0, '1': 1, '2': 2, '3': 3, '4': 5, '5': 8, '6': 13, '7': 21, '8': 34, '9': 55, '10': 89, '-1': '?', '-2': 'Coffee'},
+            'sequential': {'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, '-1': '?', '-2': 'Coffee'},
+            'playing-cards': {'0': 'Ace', '1': 2, '2': 3, '3': 5, '4': 8, '5': 'King', '-1': '?', '-2': 'Coffee'},
+            't-shirt': {'0': 'XS', '1': 'S', '2': 'M', '3': 'L', '4': 'XL', '5': 'XXL', '-1': '?', '-2': 'Coffee'},
+        };
+        if (board.deck === 'custom-deck') {
+            voteMap = {
+                ...voteMap,
+                'custom-deck': {
+                    ...Object.keys(board.cards).reduce((acc, card) => ({ ...acc, ['' + card]: board.cards[card].text }), {}),
+                    '-1': '?',
+                    '-2': 'Coffee',
+                }
+            }
+        }
+
+        console.log(`>>> Vote [${userName}]: ${voteMap[board.deck][vote]}`);
     }
 
-    actionArr = actionArr || ['>>>', action, data];
-    console.log(...actionArr);
+    // Stories
+    if (data.d.a === 'm' && !!data.d.b?.p?.includes('/stories/') && !!data.d.b?.d?.started_at) {
+        const id = data.d.b.p.split('/');
+        const storyId = id[0] === 'rooms' && id[2] === 'stories' ? id[3] : '0';
+        const storyName = board.stories[storyId]?.text;
 
-    window.actions = window.actions || [];
-    window.actions.push(actionArr);
-    window.localStorage['actions'] = JSON.stringify(window.actions);
-    window.localStorage['room'] = document.location.hash.split('/')?.[2];
-}),
+        console.log(`>>> Story [${Number(storyId) + 1}/${Object.keys(board.stories).length}]: ${storyName}`);
+    }
 
-e.hub.connectionSlow`;
+    return msg;
+}
 
-(function() {
-    'use strict';
+const wsSend = function(data, url, wsObject) {
+    // console.debug(">>> Sending message to " + url + " : " + data);
+    return data;
+}
 
-    new MutationObserver(async (mutations, observer) => {
-        let oldScript = mutations
-            .flatMap(e => [...e.addedNodes])
-            .filter(e => e.tagName == 'SCRIPT')
-            .find(e => e.src.match(/application\.js\?v=1\.0\.0\./));
+function MutableMessageEvent (o) {
+    this.bubbles = o.bubbles || false;
+    this.cancelBubble = o.cancelBubble || false;
+    this.cancelable = o.cancelable || false;
+    this.currentTarget = o.currentTarget || null;
+    this.data = o.data || null;
+    this.defaultPrevented = o.defaultPrevented || false;
+    this.eventPhase = o.eventPhase || 0;
+    this.lastEventId = o.lastEventId || '';
+    this.origin = o.origin || '';
+    this.path = o.path || new Array(0);
+    this.ports = o.parts || new Array(0);
+    this.returnValue = o.returnValue || true;
+    this.source = o.source || null;
+    this.srcElement = o.srcElement || null;
+    this.target = o.target || null;
+    this.timeStamp = o.timeStamp || null;
+    this.type = o.type || 'message';
+    this.__proto__ = o.__proto__ || MessageEvent.__proto__;
+}
 
-        if (oldScript) {
-            observer.disconnect();
-            oldScript.remove();
+const _WS = unsafeWindow.WebSocket;
+unsafeWindow.WebSocket = function(url, protocols) {
+    let WSObject = {};
+    this.url = url;
+    this.protocols = protocols;
+    if (!this.protocols) {
+        WSObject = new _WS(url);
+    } else {
+        WSObject = new _WS(url, protocols);
+    }
 
-            let text = await fetch(oldScript.src)
-                .then(e => e.text())
-                .then(e => e.replace(/e.hub.disconnected.*e\.hub\.connectionSlow/g, replaceScript));
+    const _send = WSObject.send;
+    WSObject.send = function(data) {
+        arguments[0] = wsSend(data, WSObject.url, WSObject) || data;
+        _send.apply(this, arguments);
+    }
 
-            let newScript = document.createElement('script');
-            newScript.type = 'text/javascript';
-            newScript.textContent = text;
-            document.querySelector('head').appendChild(newScript);
+    WSObject._addEventListener = WSObject.addEventListener;
+    WSObject.addEventListener = function() {
+        const eventThis = this;
+        if (arguments[0] === 'message') {
+            arguments[1] = (
+                function (userFunc) {
+                    return function instrumentAddEventListener () {
+                        arguments[0] = wsReceive(new MutableMessageEvent(arguments[0]), WSObject.url, WSObject);
+                        if (arguments[0] === null) return;
+                        userFunc.apply(eventThis, arguments);
+                    };
+                }
+            )(arguments[1]);
         }
-    }).observe(document, {
-        childList: true,
-        subtree: true,
-    })
-})();
+        return WSObject._addEventListener.apply(this, arguments);
+    }
+
+    Object.defineProperty(WSObject, 'onmessage', {
+        set: function () {
+            const eventThis = this;
+            const userFunc = arguments[0];
+            const onMessageHandler = function () {
+                arguments[0] = wsReceive(new MutableMessageEvent(arguments[0]), WSObject.url, WSObject);
+                if (arguments[0] === null) return;
+                userFunc.apply(eventThis, arguments);
+            }
+            WSObject._addEventListener.apply(this, ['message', onMessageHandler, false]);
+        }
+    });
+
+    return WSObject;
+}
