@@ -18,7 +18,8 @@
     const password = '';   // leave '' if you have autofill on your browser
     const secretKey = 'pw7kpzhkzxbyy7zc'; // you MUST replace this one with yours
     // Add new TOTP from here: https://mysignins.microsoft.com/security-info
-    //   > Add sign-in method > Authenticator app > I want to use a different authenticator app > Can't scan image? > Secret key
+    //   > Add sign-in method > Authenticator app > I want to use a different authenticator app > Next > Can't scan image? > Secret key
+	//																								   > Scan the QR code with Google Authenticator > Next > Enter the code from Google Authenticator
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     console.log('Fourth Open VPN auto login');
