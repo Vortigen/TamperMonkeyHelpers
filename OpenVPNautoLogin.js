@@ -1,13 +1,17 @@
 // ==UserScript==
-// @name         Fourth Open VPN auto login - 18.11.2024
+// @name         Fourth Open VPN auto login - 22.12.2024
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.9
 // @description  Fourth Open VPN auto login
 // @author       :ako-iskate-moga-da-vi-napravq-demo:
 // @match        https://login.microsoftonline.com/*/saml2*
 // @match        https://login.microsoftonline.com/*/login*
 // @match        https://login.microsoftonline.com/common/DeviceAuthTls/reprocess*
 // @match        https://login.microsoftonline.com/common/SAS/ProcessAuth*
+// @match        https://fourth.openvpn.com/connect*
+// @grant        window.close
+// @grant        unsafeWindow
+// @grant        GM_addElement
 // @run-at       document-start
 // ==/UserScript==
 
@@ -49,22 +53,33 @@
         });
     });
 
-    const loadScript = () => new Promise((resolve) => {
-        console.log('loadScript');
-        const script = document.createElement('script');
-        script.addEventListener('load', () => {
-            console.log('loadScript loaded');
-            resolve();
+    const loadScript = () => new Promise((resolve, reject) => {
+        const script = GM_addElement('script', {
+            src: 'https://cdnjs.cloudflare.com/ajax/libs/otpauth/9.1.5/otpauth.umd.min.js',
+            type: 'text/javascript'
         });
-        script.setAttribute('src', 'https://cdnjs.cloudflare.com/ajax/libs/otpauth/9.1.5/otpauth.umd.min.js');
-        document.head.appendChild(script);
-        console.log('loadScript done');
+        script.addEventListener('load', () => {
+            if (!!unsafeWindow.OTPAuth) {
+                console.log('OTPAuth loaded :)');
+                return resolve();
+            }
+            console.log('OTPAuth NOT loaded :(');
+            reject();
+        });
+        script.addEventListener('error', () => {
+            console.log('OTPAuth script NOT loaded :(');
+            reject();
+        });
     });
 
+    let checkDOMinterval;
+
     const doit = async () => {
+        clearInterval(checkDOMinterval);
+
         // STEP 1 - email, password
         if (isLocation('saml2')) {
-            console.log('STEP 1/3 (email, password)');
+            console.log('STEP 1/4 (email, password)');
             const emailInput = await getInput('email');
             const submitEmailButton = await getInput('submit', ['Next', 'Напред']);
             email && (emailInput.value = email);
@@ -78,32 +93,61 @@
             validate(passwordInput);
             const submitPasswordButton = await getInput('submit', ['Sign in', 'Влизане']);
             submitPasswordButton.click();
-            console.log('STEP 1/3 done');
+            console.log('done');
         }
 
         // STEP 2 - code
         if (isLocation('reprocess') || isLocation('login')) {
-            console.log('STEP 2/3 (code)');
-            await loadScript();
+            console.log('STEP 2/4 (code)');
+            try {
+                await loadScript();
+            } catch {
+                console.log('not happy :(');
+                return;
+            }
             const codeInput = await getInput('tel');
             codeInput.value = new unsafeWindow.OTPAuth.TOTP({ secret: secretKey }).generate();
             validate(codeInput);
             const submitCodeButton = await getInput('submit');
             submitCodeButton.click();
-            console.log('STEP 2/3 done');
+            console.log('done');
         }
 
         // STEP 3 - remember
         if (isLocation('ProcessAuth')) {
-            console.log('STEP 3/3 (remember)');
+            console.log('STEP 3/4 (remember)');
             const submitYesButton = await getInput('submit');
             submitYesButton.click();
-            console.log('STEP 3/3 done');
+            console.log('done');
+        }
+
+        // STEP 4 - connected
+        if (isLocation('connect')) {
+            console.log('STEP 4/4 (connected)');
+            setTimeout(() => {
+                const msg = document.querySelector(".header")?.textContent;
+                if (msg === 'You’re connected!') { // Bulgarian is not supported here
+                    window.close();
+                } else {
+                    console.log('hmmmm, connected msg not found');
+                }
+            }, 4000);
+            console.log('done');
         }
     };
 
-    if (document.readyState === "complete" || document.readyState === "loaded") {
-        console.log("DOM already loaded, doing it...");
-        await doit();
-    } else document.addEventListener("DOMContentLoaded", doit);
+
+    const checkDOM = async () => {
+        if (document.readyState === "complete" || document.readyState === "loaded") {
+            console.log("DOM content already loaded, doing it...");
+            await doit();
+        } else {
+            console.log("DOM content not loaded, listening for the event...");
+            document.removeEventListener("DOMContentLoaded", doit);
+            document.addEventListener("DOMContentLoaded", doit);
+        }
+    };
+
+    checkDOMinterval = setInterval(checkDOM, 1000);
+    checkDOM();
 })();
