@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Fourth Open VPN auto login - 30.12.2024
+// @name         Fourth Open VPN auto login - 08.08.2025
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.2
 // @description  Fourth Open VPN auto login
 // @author       :ako-iskate-moga-da-vi-napravq-demo:
 // @match        https://login.microsoftonline.com/*/saml2*
@@ -19,10 +19,13 @@
   // EDIT /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   const email = ""; // use empty for auto fill
   const password = ""; // use empty for auto fill
-  const secretKey = "";
+  const secretKey = '';
   // Add TOTP from here, you must have only 2 methods: Password and TOTP -- https://mysignins.microsoft.com/security-info
   //   > Add sign-in method > Authenticator app > I want to use a different authenticator app > Can't scan image? > Secret key
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  const clickButtons = true;
+  const closeWindow = true;
 
   console.log("Fourth Open VPN auto login");
 
@@ -38,12 +41,12 @@
       checkValue();
     });
 
-  const getInput = (type, values = [null]) => {
+  const getInput = (type, values = [null], otherSelector = null) => {
     const selector = values
       .map(
         (value) => `input[type="${type}"]${value ? `[value="${value}"]` : ""}`
       )
-      .join(",");
+      .join(",") + (otherSelector ? ',' + otherSelector : '');
     return getSelector(selector);
   };
 
@@ -90,9 +93,9 @@
   const doit = async () => {
     clearInterval(checkDOMinterval);
 
-    // STEP 1 - email, password
+    // SCREEN: email, password
     if (isLocation("saml2")) {
-      console.log("STEP 1/4 (email, password)");
+      console.log("SCREEN: email, password");
       console.log("waiting for email input...");
       const emailInput = await getInput("email");
       console.log("email input acquired", { emailInput });
@@ -108,7 +111,7 @@
       console.log("email input validated, waiting for submit...");
       const submitEmailButton = await getInput("submit", ["Next", "Напред"]);
       console.log("submit acquired, clicking...");
-      submitEmailButton.click();
+      clickButtons && submitEmailButton.click();
 
       console.log("waiting for password input...");
       const passwordInput = await getInput("password");
@@ -131,13 +134,13 @@
         "Влизане",
       ]);
       console.log("submit acquired, clicking...");
-      submitPasswordButton.click();
+      clickButtons && submitPasswordButton.click();
       console.log("done");
     }
 
-    // STEP 2 - code
+    // SCREEN: code
     if (isLocation("reprocess") || isLocation("login")) {
-      console.log("STEP 2/4 (code)");
+      console.log("SCREEN: code");
       console.log("loading OTPAuth...");
       try {
         await loadScript();
@@ -145,8 +148,30 @@
         console.log("not happy :(");
         return;
       }
+
       console.log("waiting for code input...");
-      const codeInput = await getInput("tel");
+      let codeInput = await getInput("tel", [null], '[data-value="PhoneAppOTP"],#appConfirmTitle');
+
+      if (
+          codeInput?.innerText?.includes('Do you trust fourth.com?') ||
+          codeInput?.innerText?.includes('Имате ли доверие на fourth.com?')
+      ) {
+          console.log("do you trust confirmation acquired, waiting for submit...");
+          const submitCodeButton = await getInput("submit");
+          console.log("submit acquired, clicking...");
+          clickButtons && submitCodeButton.click();
+          codeInput = await getInput("tel");
+      }
+
+      if (
+          codeInput?.innerText?.includes('Use a verification code') ||
+          codeInput?.innerText?.includes('Използване на код за потвърждение')
+      ) {
+          console.log("use a verification code button acquired, clicking...");
+          clickButtons && codeInput.click();
+          codeInput = await getInput("tel");
+      }
+
       console.log("code input acquired", codeInput);
       const newCode = new unsafeWindow.OTPAuth.TOTP({
         secret: secretKey,
@@ -158,13 +183,13 @@
       console.log("code input validated, waiting for submit...");
       const submitCodeButton = await getInput("submit");
       console.log("submit acquired, clicking...");
-      submitCodeButton.click();
+      clickButtons && submitCodeButton.click();
       console.log("done");
     }
 
-    // STEP 3 - remember
+    // SCREEN: remember
     if (isLocation("ProcessAuth")) {
-      console.log("STEP 3/4 (remember)");
+      console.log("SCREEN: remember");
       console.log("waiting for don't show checkbox...");
       const dontShow = await getInput("checkbox");
       console.log("don't show checkbox acquired, checking...");
@@ -172,21 +197,21 @@
       console.log("checked. waiting for submit...");
       const submitYesButton = await getInput("submit");
       console.log("submit acquired, clicking...");
-      submitYesButton.click();
+      clickButtons && submitYesButton.click();
       console.log("done");
     }
 
-    // STEP 4 - connected
+    // SCREEN: connected
     if (isLocation("connect")) {
-      console.log("STEP 4/4 (connected)");
+      console.log("SCREEN: connected");
       console.log("waiting for connected header message...");
-      const header = await getSelector("h1.header");
+      const header = await getSelector("span.header");
       console.log("connected header message acquired", {
         message: header.textContent,
       });
       if (header.textContent === "You’re connected!") {
         // not translated in bulgarian
-        window.close();
+        closeWindow && window.close();
       } else {
         console.log("hmmmm, connected header message is not found :(");
       }
