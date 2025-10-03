@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Fourth Open VPN auto login - 08.08.2025
+// @name         Fourth Open VPN auto login - 01.10.2025
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      3.0
 // @description  Fourth Open VPN auto login
 // @author       :ako-iskate-moga-da-vi-napravq-demo:
 // @match        https://login.microsoftonline.com/*/saml2*
@@ -19,9 +19,9 @@
   // EDIT /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   const email = ""; // use empty for auto fill
   const password = ""; // use empty for auto fill
-  const secretKey = '';
-  // Add TOTP from here, you must have only 2 methods: Password and TOTP -- https://mysignins.microsoft.com/security-info
-  //   > Add sign-in method > Authenticator app > I want to use a different authenticator app > Can't scan image? > Secret key
+  const secretKey = "";
+  // Add the TOTP secret (32 char string) from the MS Authenticator from here: https://mysignins.microsoft.com/security-info
+  // How to get the secret? -> https://gist.github.com/chowder/2ead734d60d84d4d15034fcce81aaaf9
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   const clickButtons = true;
@@ -148,6 +148,16 @@
         console.log("not happy :(");
         return;
       }
+
+      console.log("waiting for #signInAnotherWay link...");
+      const signInAnotherWayLink = await getSelector('#signInAnotherWay');
+      console.log("sign link acquired, clicking...");
+      clickButtons && signInAnotherWayLink.click();
+
+      console.log("waiting for 'Use verification code' link...");
+      const useVerificationCode = await getSelector('[data-value=PhoneAppOTP]');
+      console.log("code link acquired, clicking...");
+      clickButtons && useVerificationCode.click();
 
       console.log("waiting for code input...");
       let codeInput = await getInput("tel", [null], '[data-value="PhoneAppOTP"],#appConfirmTitle');
