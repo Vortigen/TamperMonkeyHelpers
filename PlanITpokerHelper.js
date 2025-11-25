@@ -1,14 +1,13 @@
 // ==UserScript==
-// @name         2024 PlanITpocker helper
+// @name         PlanITpocker helper - 18.11.2025
 // @namespace    http://tampermonkey.net/
+// @version      3.2
 // @description  Adding helper messages in the JS console.
-// @version      3.1
+// @author       :ako-iskate-moga-da-vi-napravq-demo:
 // @match        https://app.planitpoker.com/room/*
+// @grant        unsafeWindow
 // @run-at       document-start
 // ==/UserScript==
-
-//* eslint-disable prettier/prettier */
-// unsafeWindow.WebSocket hook /////////////////////////////////////////////////////////////////////
 
 const wsUrlMatch = ".firebaseio.com/.ws?v=";
 let board = null;
@@ -16,7 +15,10 @@ let board = null;
 unsafeWindow.console.error = (...args) => console.debug(...args);
 unsafeWindow.console.warn = (...args) => console.debug(...args);
 unsafeWindow.console.clear();
-setTimeout(() => unsafeWindow.console.clear(), 1000);
+setTimeout(() => {
+  unsafeWindow.console.clear();
+  console.log('>>> PlanITpocker helper - 18.11.2025');
+}, 1000);
 
 const wsReceive = function (msg, url, wsObject) {
   // console.debug(">>> Received message from " + url + " : " + msg.data);
@@ -130,13 +132,19 @@ const wsReceive = function (msg, url, wsObject) {
         "-1": "?",
         "-2": "Coffee",
       },
-      "playing-cards": {
-        0: "Ace",
-        1: 2,
-        2: 3,
-        3: 5,
-        4: 8,
-        5: "King",
+      hours: {
+        0: 0,
+        1: 1,
+        2: 2,
+        3: 3,
+        4: 4,
+        5: 6,
+        6: 8,
+        7: 12,
+        8: 16,
+        9: 24,
+        10: 32,
+        11: 40,
         "-1": "?",
         "-2": "Coffee",
       },
