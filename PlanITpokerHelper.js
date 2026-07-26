@@ -8,7 +8,7 @@
 // @grant        unsafeWindow
 // @run-at       document-start
 // ==/UserScript==
-// Testing comment - dlelete!
+
 
 const wsUrlMatch = ".firebaseio.com/.ws?v=";
 let board = null;
